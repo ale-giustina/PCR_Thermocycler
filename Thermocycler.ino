@@ -439,8 +439,8 @@ void loop() {
 
   last_millis=millis();
 
-  if(digitalRead(L_BTN)==LOW){l_btn=true; l_btn_debounce=millis();}else if (millis()-l_btn_debounce>100){l_btn=false;t_p_l = 0;l_btn_stk=false;}
-  if(digitalRead(R_BTN)==LOW){r_btn=true; r_btn_debounce=millis();}else if (millis()-r_btn_debounce>100){r_btn=false;t_p_r = 0;r_btn_stk=false;}
+  if(digitalRead(L_BTN)==LOW){l_btn=true; l_btn_debounce=millis();}else if (millis()-l_btn_debounce>10){l_btn=false;t_p_l = 0;l_btn_stk=false;}
+  if(digitalRead(R_BTN)==LOW){r_btn=true; r_btn_debounce=millis();}else if (millis()-r_btn_debounce>10){r_btn=false;t_p_r = 0;r_btn_stk=false;}
   
   if(t_p_r>4000 && t_p_l>4000){
 
