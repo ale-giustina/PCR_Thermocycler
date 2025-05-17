@@ -32,7 +32,7 @@ bool H_CAP_act = false;
 bool FAN_act = false;
 
 bool AZ_5 = false;
-bool auto_AZ_5 = false;
+String AZ_5_info = "";
 
 float target_temp_block = 0;
 float target_temp_cap = 0;
@@ -42,6 +42,10 @@ float temp_cap = 0;
 float temp_body_1 = 0;
 float temp_body_2 = 0;
 
+long temp_timeout = 600000;
+long temp_tim_tim = 0;
+bool set_timeout = false;
+bool AZ_tim=false;
 
 //default program states
 bool force_end = false;
@@ -57,7 +61,9 @@ float program_block_targets[program_length] = {95.0, 60.0, 72.0};
 float program_cap_targets[program_length]   = {110, 110, 110};  
 unsigned long hold_times[program_length]    = {30000, 30000, 45000}; 
 
-int cycles = 5;
+int end_hold = 60000;
+
+int cycles = 2;
 
 bool program_end_phase = false;
 unsigned long end_hold_start = 0;
@@ -146,15 +152,15 @@ void writeLogHeader() {
 void setup() {
 
   //start serial comm
-  Serial.begin(9600);
-  Serial.setTimeout(100);
+  Serial.begin(115200);
+  Serial.setTimeout(50);
   delay(100);
 
   //initialize lcd
   lcd.init();
   lcd.backlight();
   lcd.setCursor(0, 0);
-  lcd.print("connecting to serial");
+  lcd.print("Connecting to serial");
   lcd.setCursor(0, 1);
 
   //pin setup
@@ -208,7 +214,7 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("System ready        ");
   lcd.setCursor(0, 3);
-  lcd.print("@Ale-G 2025  V1.0.0");
+  lcd.print("@Ale-G 2025  V1.1.0");
 
   
   delay(5000);
@@ -228,7 +234,7 @@ void update_values(){
   float d_t_block = target_temp_block-temp_body_1;
   float d_t_cap = target_temp_cap-temp_cap;
 
-  FAN_act = d_t_block<-1 && heat_act;
+  FAN_act = d_t_block<-2 && heat_act;
 
   H70_act = d_t_block>-2 && heat_act;
   H50_act = d_t_block>-2 && heat_act;
@@ -301,22 +307,20 @@ void handleCommand(String cmd) {
   val.trim();
 
   // integer variables
-  if (var == "H70_pwm") H70_pwm = val.toInt();
-  else if (var == "H50_pwm") H50_pwm = val.toInt();
+  if (var == "H_pwm") {H70_pwm = val.toInt(); H50_pwm = val.toInt();}
   else if (var == "H_CAP_pwm") H_CAP_pwm = val.toInt();
 
   // float variables
-  else if (var == "target_temp_block") target_temp_block = val.toFloat();
-  else if (var == "target_temp_cap") target_temp_cap = val.toFloat();
+  else if (var == "target_block_temp") target_temp_block = val.toFloat();
+  else if (var == "target_cap_temp") target_temp_cap = val.toFloat();
 
   // boolean variables
-  else if (var == "H70_act") H70_act = parseBool(val);
-  else if (var == "H50_act") H50_act = parseBool(val);
+  else if (var == "H_act") {H70_act = parseBool(val);H50_act = parseBool(val);}
   else if (var == "H_CAP_act") H_CAP_act = parseBool(val);
   else if (var == "FAN_act") FAN_act = parseBool(val);
-  else if (var == "AZ_5") AZ_5 = parseBool(val);
+  else if (var == "AZ_5") {AZ_5 = parseBool(val);AZ_5_info="REMOTE SHUTDOWN";}
   else if (var == "heat_act") heat_act = parseBool(val);
-
+  else {Serial.print("Unrecognized variable");return;}
   // confirm output
   Serial.print("Set ");
   Serial.print(var);
@@ -424,6 +428,10 @@ long l_btn_debounce = 0;
 
 long cooling_phase = 0;
 
+int pointer = 0;
+int redundancy_score = 0;
+long red_mismatch_timer = 0;
+
 void loop() {
 
   t_p_r+=millis()-last_millis;
@@ -431,12 +439,13 @@ void loop() {
 
   last_millis=millis();
 
-  if(digitalRead(L_BTN)==LOW){l_btn=true; l_btn_debounce=millis();}else if (millis()-l_btn_debounce>100){l_btn=false;t_p_r = 0;l_btn_stk=false;}
-  if(digitalRead(R_BTN)==LOW){r_btn=true; r_btn_debounce=millis();}else if (millis()-r_btn_debounce>100){r_btn=false;t_p_l = 0;r_btn_stk=false;}
+  if(digitalRead(L_BTN)==LOW){l_btn=true; l_btn_debounce=millis();}else if (millis()-l_btn_debounce>100){l_btn=false;t_p_l = 0;l_btn_stk=false;}
+  if(digitalRead(R_BTN)==LOW){r_btn=true; r_btn_debounce=millis();}else if (millis()-r_btn_debounce>100){r_btn=false;t_p_r = 0;r_btn_stk=false;}
   
-  if(t_p_r>2000 && t_p_l>2000){
+  if(t_p_r>4000 && t_p_l>4000){
 
     AZ_5=true;
+    AZ_5_info="MANUAL SHUTDOWN";
 
   }
 
@@ -459,8 +468,6 @@ void loop() {
 
     last_update=millis();
 
-    
-
   }
 
   //screen update function
@@ -472,8 +479,20 @@ void loop() {
       update_screen=false;
 
     }
+    
+    if(t_p_r>1000 && t_p_l>1000){
 
-    if(scene == 0){
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("   AZ-5 ACTIVATING  ");
+      lcd.setCursor(0,2);
+      lcd.print("        ");
+      lcd.print(String(4-(t_p_r+t_p_l)/2000));
+      lcd.print(".00");
+
+
+    }
+    else if(scene == 0){
 
       lcd.setCursor(0, 0);
       lcd.print("B:");
@@ -501,11 +520,11 @@ void loop() {
       lcd.print("   "); // clear trailing chars if needed
 
       lcd.setCursor(0, 3);
-      lcd.print(heat_act ? "System ARMED" : "System SAFE");
+      lcd.print(" Settings     Start ");
 
 
     }
-    if(scene == 2){
+    else if(scene == 2){
 
       lcd.setCursor(0, 0);
       lcd.print("B:");
@@ -526,15 +545,24 @@ void loop() {
       lcd.print("C ");
 
       lcd.setCursor(0, 2);
-      lcd.print("Fan:");
-      lcd.print(FAN_act ? "On " : "Off");
-      lcd.print(" Pwm:");
+      lcd.print("F:");
+      lcd.print(FAN_act ? "T" : "F");
+      lcd.print(" P:");
       lcd.print(H50_pwm);
 
       H50_pwm>9 ?  lcd.print("") : lcd.print(" ");
       H50_pwm>99 ?  lcd.print("") : lcd.print(" ");
-      lcd.print(" H:"); // clear trailing chars if needed
-      holding ? lcd.print("Y") : lcd.print("N");
+      if(holding && !program_end_phase){
+        lcd.print(" T: ");
+        lcd.print(String((millis() - step_start_time)/1000) +">"+ String((hold_times[program_step])/1000));
+      }
+      else if(program_end_phase && !cooling_started){
+        lcd.print(" T: ");
+        lcd.print(String((millis() - end_hold_start)/1000) +">"+ String((end_hold)/1000));
+      }
+      else{
+        lcd.print("           ");
+      }
 
       lcd.setCursor(0, 3);
       if (program_start && !program_end_phase) {
@@ -544,6 +572,7 @@ void loop() {
         lcd.print(program_length);
         lcd.print(" Cycle: ");
         lcd.print(floor(abs_program_step/program_length)+1,0);
+        lcd.print("/"+String(cycles));
 
       } else if (program_end_phase && !cooling_started) {
         lcd.print("Ending phase...     ");
@@ -555,17 +584,32 @@ void loop() {
 
 
     }
-    if(scene==1){
+    else if(scene==1){
       lcd.setCursor(0,0);
       lcd.print("Start program?");
       lcd.setCursor(0,2);
       lcd.print("    Yes       No    ");
     }
-    if(scene==3){
+    else if(scene==3){
       lcd.setCursor(0,0);
       lcd.print("Ending hold?");
       lcd.setCursor(0,2);
       lcd.print("    Yes       No    ");
+    }
+    else if(scene==4){
+      lcd.setCursor(0,0);
+      (pointer == 0) ? lcd.print("> ") : lcd.print("");
+      lcd.print("Cycles:");
+      lcd.print(cycles);
+      lcd.setCursor(0,1);
+      (pointer == 1) ? lcd.print("> ") : lcd.print("");
+      lcd.print("Extension:");
+      lcd.print(String(hold_times[2]/1000)+"s");
+      lcd.setCursor(0,2);
+      (pointer == 2) ? lcd.print("> ") : lcd.print("");
+      lcd.print("Save and exit");
+      lcd.setCursor(0,3);
+      lcd.print("  Change      Down  ");
     }
 
   }
@@ -578,6 +622,58 @@ void loop() {
     update_screen=true;
 
   }
+  if(scene==0 && l_btn==true && r_btn==false && l_btn_stk==false && !program_start){
+
+    scene = 4;
+    l_btn_stk=true;
+    update_screen=true;
+
+  }
+  if(scene==4){
+
+    if(r_btn==true && l_btn==false && r_btn_stk==false && !program_start){
+    
+      pointer++;
+      r_btn_stk=true;
+      if(pointer>=3){pointer=0;};
+      update_screen=true;
+
+    }
+    if(l_btn==true && r_btn==false && l_btn_stk==false && !program_start && pointer==0){
+
+      cycles++;
+      l_btn_stk=true;
+
+    }
+    if(t_p_l>2000 && r_btn==false && pointer==0){
+
+      cycles=0;
+      update_screen=true;
+
+    }
+    if(l_btn==true && r_btn==false && l_btn_stk==false && !program_start && pointer==1){
+
+      hold_times[2] = hold_times[2]+15000;
+      l_btn_stk=true;
+
+    }
+    if(t_p_l>2000 && r_btn==false && pointer==1){
+
+      hold_times[2] = 30000;
+      update_screen=true;
+
+    }
+    if(l_btn==true && r_btn==false && l_btn_stk==false && !program_start && pointer==2){
+
+      scene=0;
+      l_btn_stk=true;
+      pointer=0;
+      update_screen=true;
+
+    }
+
+  }
+
   if(scene==1 && r_btn==true && l_btn==false && r_btn_stk==false && !program_start){
     scene = 0;
     r_btn_stk=true;
@@ -626,18 +722,34 @@ void loop() {
       target_temp_block = program_block_targets[program_step];
       target_temp_cap = program_cap_targets[program_step];
 
+      if(!set_timeout){
+
+        temp_tim_tim=millis();
+        set_timeout=true;
+
+      }
+      if(millis()-temp_tim_tim>temp_timeout){
+
+        AZ_5=true;
+        AZ_5_info="HEATING TIMEOUT";
+
+      }
+
       update_values();
 
       //holding temps
       if (arrived_at_temp && !holding) {
         holding = true;
         step_start_time = millis();
+        update_screen = true;
       }
 
       if (holding && (millis() - step_start_time >= hold_times[program_step])) {
         program_step++;
         abs_program_step++;
         holding = false;
+        set_timeout=false;
+        update_screen = true;
       }
 
       //end hold
@@ -646,35 +758,63 @@ void loop() {
         program_end_phase = true;
         end_hold_start = millis();
         target_temp_block = 72;  // Hold at 55C
+        update_screen = true;
       }
       else if(program_step >= program_length){
         program_step = 0;
       }
-
+      //failsafe
       if(program_step == program_length){
         program_step=0;
       }
 
     } else {
       
-      if (!cooling_started && (millis() - end_hold_start >= 600000)) { // 10 minutes
+      if (!cooling_started && (millis() - end_hold_start >= end_hold)) {
         cooling_started = true;
         target_temp_block = 0;
         target_temp_cap = 0;
         cooling_phase = millis();
+        update_screen=true;
       }
-      else if (millis()-cooling_phase >=600000 && cooling_started){
+      else if ((millis()-cooling_phase >=180000 || temp_body_1<26) && cooling_started){
 
         heat_act=false;
+        program_start=false;
+        holding=false;
+        program_step=0;
+        abs_program_step=0;
+        program_end_phase=false;
+        cooling_started=false;
+        update_screen=true;
+        scene=0;
 
       }
     }
   }
 
+  //sanity checks
   if(temp_body_1>130||temp_body_2>130||temp_cap>130){
     AZ_5=true;
-    auto_AZ_5=true;
+    AZ_5_info="TEMP RUNAWAY";
   }
+  else if (isnan(temp_body_1) || isnan(temp_body_2) || isnan(temp_cap) || temp_body_1==0 || temp_body_2==0 || temp_cap==0) {
+    AZ_5 = true;
+    AZ_5_info = "SENSOR FAULT";
+  }
+  if (abs(temp_body_1 - temp_body_2) > 15) {
+      if (millis() - red_mismatch_timer > 1000) {
+          redundancy_score++;
+          red_mismatch_timer = millis();
+      }
+  } else {
+      redundancy_score = 0;
+  }
+  if(redundancy_score>5){
+    AZ_5 = true;
+    AZ_5_info = "REDUNDANCY MISMATCH";
+  }
+
 
   //scram function
   if(!AZ_5){
@@ -700,6 +840,7 @@ void loop() {
 
     }
     update_values();
+    
 
   }
   else{
@@ -720,7 +861,7 @@ void loop() {
     lcd.setCursor(0,1);
     lcd.print("ALL COOLING ACTIVE");
     lcd.setCursor(0,2);
-    auto_AZ_5 ? lcd.print("HEAT RUNAWAY") : lcd.print("MANUAL SHUTDOWN");
+    lcd.print(AZ_5_info);
     lcd.setCursor(0,3);
     lcd.print("RESET TO CONTINUE...");
 
@@ -732,7 +873,7 @@ void loop() {
         if (dataFile) {
 
           dataFile.print("AZ_5 ACTIVATED, REASON: ");dataFile.print(",");
-          auto_AZ_5 ? dataFile.print("HEAT RUNAWAY") : dataFile.print("MANUAL SHUTDOWN");
+          dataFile.print(AZ_5_info);
           dataFile.println(); // End the CSV row
           dataFile.close();
 
@@ -785,33 +926,37 @@ void loop() {
 
     heat_act ? Serial.println("Heat_act: True") : Serial.println("Heat_act: False");
     Serial.println("-------------");
-    delay(200);
+    delay(50);
   }
   else{
 
     String response = String("{") +
       "\"block_temperature\": " + String(temp_body_1, 2) + String(", ") +
+      "\"target_block_temp\": " + String(target_temp_block, 2) + String(", ") +
       "\"block_gradient\": " + String(avg_rate_body , 2) + String(", ") +
       "\"cap_temperature\": " + String(temp_cap) + String(", ") +
+      "\"target_cap_temp\": " + String(target_temp_cap, 2) + String(", ") +
       "\"cap_gradient\": " + String(avg_rate_cap, 2) + String(", ") +
+      "\"redundant_temp\": " + String(temp_body_2, 2) + String(", ") +
       "\"buttons\": [" + String(l_btn) + ", " + String(r_btn) + "], " +
 
-      "\"H70_pwm\": " + String(H70_pwm) + ", " +
-      "\"H50_pwm\": " + String(H50_pwm) + ", " +
+      "\"H_pwm\": " + String(H70_pwm) + ", " +
       "\"H_CAP_pwm\": " + String(H_CAP_pwm) + ", " +
 
-      "\"H70_act\": " + (H70_act ? "true" : "false") + ", " +
-      "\"H50_act\": " + (H50_act ? "true" : "false") + ", " +
+      "\"H_act\": " + (H70_act ? "true" : "false") + ", " +
       "\"H_CAP_act\": " + (H_CAP_act ? "true" : "false") + ", " +
       "\"FAN_act\": " + (FAN_act ? "true" : "false") + ", " +
 
       "\"AZ_5\": " + (AZ_5 ? "true" : "false") + ", " +
-      "\"target_temp_block\": " + String(target_temp_block, 2) + ", " +
-      "\"target_temp_cap\": " + String(target_temp_cap, 2) + ", " +
+      
       "\"heat_act\": " + (heat_act ? "true" : "false") +", " +
-      "\"temp_reached\": " + (arrived_at_temp ? "true" : "false") +
-
+      "\"temp_reached\": " + (arrived_at_temp ? "true" : "false") +", " +
+      "\"holding_temp\": " + (holding ? "true" : "false") +", " +
+      "\"program_active\": " + (program_start ? "true" : "false") +", " +
+      "\"timers\": [" + ((holding && !program_end_phase) ? String((millis() - step_start_time)/1000) : String("0")) +", " + String((hold_times[program_step])/1000) +"], " +
+      "\"end_timers\": [" + ((program_end_phase && !cooling_started) ? String((millis() - end_hold_start)/1000) : String("0")) +", " + String((end_hold)/1000) +"] " +
     "}";
+
 
     Serial.println(response);
 

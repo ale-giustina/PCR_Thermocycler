@@ -12,7 +12,7 @@ from PIL import Image, ImageTk
 
 # Serial config
 SERIAL_PORT = 'COM5'
-BAUD_RATE = 9600
+BAUD_RATE = 115200
 ACK_TIMEOUT = 2  # seconds to wait for ACK before retrying
 MAX_RETRIES = 3  # max number of retries per message
 sd_mode = True  # set to True for SD mode, False for normal mode
@@ -31,9 +31,9 @@ ui_labels = {}
 graph_data = {
     'time': [],
     'block_temperature': [],
-    'target_temp_block': [],
+    'target_block_temp': [],
     'cap_temperature': [],
-    'target_temp_cap': [],
+    'target_cap_temp': [],
     'ax': None,
     'fig': None,
     'canvas': None,
@@ -52,7 +52,7 @@ def update_graph(data_dict):
     graph_data['time'].append(t)
 
     # Append values, defaulting to the previous value or 0 if not present
-    for key in ['block_temperature', 'target_temp_block', 'cap_temperature', 'target_temp_cap']:
+    for key in ['block_temperature', 'target_block_temp', 'cap_temperature', 'target_cap_temp']:
         if key in data_dict:
             graph_data[key].append(float(data_dict[key]))
         else:
@@ -61,8 +61,8 @@ def update_graph(data_dict):
 
     #limit max length of data
     if len(graph_data['time']) > 1200:
-        for key in ['time', 'block_temperature', 'target_temp_block', 'cap_temperature', 'target_temp_cap']:
-            graph_data[key] = graph_data[key][-300:]
+        for key in ['time', 'block_temperature', 'target_block_temp', 'cap_temperature', 'target_cap_temp']:
+            graph_data[key] = graph_data[key][-1200:]
 
 
     # Update the graph
@@ -73,12 +73,13 @@ def update_graph(data_dict):
     ax.set_ylabel("Temperature (°C)")
 
     ax.plot(graph_data['time'], graph_data['block_temperature'], label='Block Temp', color='red')
-    ax.plot(graph_data['time'], graph_data['target_temp_block'], label='Block Target Temp', color='orange', linestyle='--')
+    ax.plot(graph_data['time'], graph_data['target_block_temp'], label='Block Target Temp', color='orange', linestyle='--')
     ax.plot(graph_data['time'], graph_data['cap_temperature'], label='Cap Temp', color='blue')
-    ax.plot(graph_data['time'], graph_data['target_temp_cap'], label='Cap Target Temp', color='green', linestyle='--')
+    ax.plot(graph_data['time'], graph_data['target_cap_temp'], label='Cap Target Temp', color='green', linestyle='--')
 
     ax.legend(loc='upper left')
     ax.set_ylim(0, 120)
+    
     graph_data['canvas'].draw()
 
 
@@ -501,7 +502,7 @@ def main(ser):
     ico = Image.open('images/icon.png')
     photo = ImageTk.PhotoImage(ico)
     root.wm_iconphoto(False, photo)
-    root.geometry("1400x900")
+    root.geometry("1400x1000")
 
     main_frame = tk.Frame(root)
     main_frame.pack(fill='both', expand=False)
@@ -509,7 +510,7 @@ def main(ser):
     side_control_frame = tk.Frame(main_frame, bd=2, relief='sunken', padx=10)
     side_control_frame.pack(side='left', fill='y', padx=5, pady=5)
     side_control_frame.pack_propagate(False)
-    side_control_frame.config(width=400, height=550)
+    side_control_frame.config(width=400, height=650)
 
     console_frame = tk.Frame(main_frame)
     console_frame.pack(side='left', fill='both', expand=True, padx=5, pady=5)
@@ -522,7 +523,7 @@ def main(ser):
     variables_frame = tk.Frame(main_frame, bd=2, relief='sunken', padx=10)
     variables_frame.pack(side='right', fill='y', padx=5, pady=5)
     variables_frame.pack_propagate(False)
-    variables_frame.config(width=300, height=550)
+    variables_frame.config(width=300, height=650)
 
     tk.Label(variables_frame, text="Live Variables", font=('Arial', 12, 'bold')).pack()
 
