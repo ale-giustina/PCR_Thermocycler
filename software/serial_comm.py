@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 from PIL import Image, ImageTk
 
 # Serial config
-SERIAL_PORT = 'COM5'
+SERIAL_PORT = ''
 BAUD_RATE = 115200
 ACK_TIMEOUT = 2  # seconds to wait for ACK before retrying
 MAX_RETRIES = 3  # max number of retries per message
@@ -587,5 +587,31 @@ if __name__ == "__main__":
                 print(f"Failed to connect to {SERIAL_PORT} after 5 seconds.")
                 exit(1)
             time.sleep(0.5)
+            
+        # If no port was found, prompt the user to select one
+        if SERIAL_PORT is None or not any(port.device == SERIAL_PORT for port in ports):
+            import tkinter.simpledialog
+            import tkinter.messagebox
+
+            root = tk.Tk()
+            root.title("Select Serial Port")
+            root.withdraw()  # Hide the main window
+
+            port_list = [port.device for port in ports]
+            if not port_list:
+                tkinter.messagebox.showerror("No Ports Found", "No serial ports detected. Please connect your device and restart the program.")
+                exit(1) 
+
+            selected_port = tkinter.simpledialog.askstring(
+                "Select Serial Port",
+                "Available ports:\n" + "\n".join(port_list) + "\n\nEnter port name (e.g., COM3):",
+                initialvalue=port_list[0]
+            )
+            if selected_port and selected_port in port_list:
+                SERIAL_PORT = selected_port
+            else:
+                tkinter.messagebox.showerror("Invalid Selection", "No valid port selected. Exiting.")
+                exit(1)
+            root.destroy()
     
     main(ser)
