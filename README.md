@@ -17,7 +17,7 @@ PCR_Thermocycler is a DIY project for building a programmable PCR (Polymerase Ch
 
 ## Features
 - Programmable temperature cycles
-- LCD display for real-time monitoring
+- LCD display
 - User-friendly interface
 - Serial communication for real-time monitoring and control
 - Data logging to SD card
@@ -47,33 +47,34 @@ The device can be controlled via the LCD interface or through a Python GUI. The 
 From the GIU you can change in real time the values of some variables seen on the right panel, such as temperature goals, heat activations and safety switches.
 1. Connect the device to your computer via USB.
 2. launch serial_comm.py, first setting the correct hwid in the code.
-3. The GUI will open, allowing you to set the temperature and time for each cycle.
-4. Click "Start" to begin the PCR process.
+3. Click "Start" to begin the PCR process.
 To edit cycles you must first edit the code in the cycle_controller function, where you can set the number of cycles and the temperature for each step.
-5. The GUI will graph the temperature over time, providing real-time feedback on the PCR process and also show all the debug variables in the right panel.
+4. The GUI will graph the temperature over time, providing real-time feedback on the PCR process and also show all the debug variables in the right panel.
 
 ### Standalone Mode
-The device can also be used in standalone mode, where it will run a pre-programmed cycle without the need for a computer. To do this, you need to modify the firmware code in `software/firmware/` to set the desired temperature and time for each cycle. Activating the cycle in Standalone mode and will not disturb Serial mode monitoring which can be used simultaneously, but if a cycle is activated from the serial interface (while a standalone cycle is active) the device will get overwhelmed as it will try to run both at the same time. 
+The device can also be used in standalone mode, where it will run a pre-programmed cycle without the need for a computer. To do this, you'll need to modify the firmware code in `software/firmware/` to set the desired temperature and time for each cycle. Activating the cycle in Standalone mode will not disturb Serial mode monitoring which can be used simultaneously, but if a cycle is activated from the serial interface (while a standalone cycle is active) the device will get overwhelmed as it will try to run both at the same time. 
 The cycle number and extension period can be set directly from the LCD interface (you can hold the change button to reset a given value).
 1. Start the device and wait for the LCD to display the main menu.
 2. Pressing the left button will allow you to set the cycle number and extension period.
 3. Pressing the right button will start the cycle.
 4. The LCD will display the current temperature, the target temperature, the fan status(F) the pwm status for the body heaters(P) and time remaining for each step of the cycle.
 5. The device will automatically switch between heating and cooling phases as per the programmed cycle.
-6. Once the cycle is complete, the device will have a holding period at 72°C that can be configured in the `software/firmware/` and after cooling return to the main menu.
+6. By pressing the right button a cycle can be interrupted, going directly to the holding period.
+7. Once the cycle is complete, the device will have a holding period at 72°C that can be configured in the `software/firmware/` and after cooling return to the main menu.
 
 
 ## Safety
 ### Hardware Safety
-The device has two thermocouples for temperature monitoring. The first one is used to control the temperature of the block, while the second one is used to monitor the temperature of the cap. 
+The device has three thermocouples for temperature monitoring. The first two are used to moonitor the temperature of the block, while the second one is used to check the temperature of the cap. 
 To account for a thermocouple failure the device has 2 safety switches that will activate if the temperature exceeds 140°C cutting all the power to the heaters.
 ### Software Safety
 The software has multiple safety checks to ensure that the device operates within safe limits. If any of these checks fail, the device will stop and display an error message on the LCD. A hard reset is required to restart the device.
-- User shutdown: The user can stop the device at any time by pressing both button simultaneously for 4 seconds.
-- Over-temperature: If the temperature exceeds 130°C, the device will lock and display an error message.
-- Redundant thermocouple: If the temperature of the two block thermocouples is different by more than 15°C, the device will lock and display an error message.
-- Sensor failure: If the temperature of the block thermocouple is below 0°C or NaN, the device will lock and display an error message.
-- Temperature timeout: If a temperature change step is not completed within 5 minutes, the device will lock and display an error message (only works in Standalone mode).
+- **User shutdown**: The user can stop the device at any time by pressing both button simultaneously for 4 seconds.
+- **Over-temperature**: If the temperature exceeds 130°C, the device will lock and display an error message.
+- **Redundant thermocouple**: If the temperature of the two block thermocouples is different by more than 15°C, the device will lock and display an error message.
+- **Sensor failure**: If the temperature of the block thermocouple is below 0°C or NaN, the device will lock and display an error message.
+- **Temperature timeout**: If a temperature change step is not completed within 5 minutes, the device will lock and display an error message (only works in Standalone mode).
+
 ## Examples
 ### Example 1: Basic Cycle
 Graph from the GUI showing a basic PCR cycle with denaturation, annealing, and extension steps.
