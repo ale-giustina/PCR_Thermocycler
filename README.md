@@ -84,6 +84,16 @@ Graph from the sd log system showing PCR cycles started from the GUI and from st
 
 More examples can be found in the `Example_logs/` directory.
 
+## Schematics
+All schematics can be found in the `hardware/` directory.
+They are divided into:
+- **Thermocycler V2 Drawing**: The aluminum main body.
+- **Thermocycler_build**: The control board and the wiring.
+- **Bracket_holder**: The bracket for the aluminum body.
+
+All the parts were created using Fusion 360 and can be found in the `hardware/` directory. The files are in .f3d format, which can be opened with Fusion 360.
+The material used for the aluminum block is 6061 aluminum, the body is made of 1.5mm aluminum sheet and all the rest is 3d printed using prusament PLA.
+
 ## Build photos
 More photos of the build process can be found in the `build_photos/` directory.
 
