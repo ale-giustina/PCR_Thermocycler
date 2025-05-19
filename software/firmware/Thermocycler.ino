@@ -61,7 +61,7 @@ float program_block_targets[program_length] = {95.0, 60.0, 72.0};
 float program_cap_targets[program_length]   = {110, 110, 110};  
 unsigned long hold_times[program_length]    = {30000, 30000, 45000}; 
 
-int end_hold = 60000;
+int end_hold = 600000;
 
 int cycles = 2;
 
